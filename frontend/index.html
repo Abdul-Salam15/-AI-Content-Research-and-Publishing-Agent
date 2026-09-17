@@ -427,6 +427,8 @@
   };
 
   let currentUser = null; // { id, name, role }
+  let currentDetailRequestId = null;
+  let realtimeChannel = null;
 
   function fmtDate(iso) {
     const d = new Date(iso);
@@ -478,7 +480,24 @@
       document.getElementById('intake-section').classList.remove('hidden');
     }
 
+    subscribeToRequestChanges();
     loadRequests();
+  }
+
+  function subscribeToRequestChanges() {
+    if (realtimeChannel) return; // already subscribed this session
+    realtimeChannel = db
+      .channel('content_requests_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'content_requests' }, () => {
+        const inRequestsView = !document.getElementById('requests-view').classList.contains('hidden');
+        const inDetail = !document.getElementById('detail-view').classList.contains('hidden');
+        if (inRequestsView && inDetail && currentDetailRequestId) {
+          openDetail(currentDetailRequestId);
+        } else if (inRequestsView) {
+          loadRequests();
+        }
+      })
+      .subscribe();
   }
 
   async function loadRequests() {
@@ -531,12 +550,14 @@
   document.getElementById('back-to-list').addEventListener('click', closeDetail);
 
   function closeDetail() {
+    currentDetailRequestId = null;
     document.getElementById('detail-view').classList.add('hidden');
     document.getElementById('list-view').classList.remove('hidden');
     loadRequests();
   }
 
   async function openDetail(requestId) {
+    currentDetailRequestId = requestId;
     document.getElementById('list-view').classList.add('hidden');
     document.getElementById('detail-view').classList.remove('hidden');
     document.getElementById('drafts-grid').innerHTML = '<div class="empty">Loading…</div>';
@@ -863,6 +884,10 @@
   });
 
   document.getElementById('logout-btn').addEventListener('click', async () => {
+    if (realtimeChannel) {
+      await db.removeChannel(realtimeChannel);
+      realtimeChannel = null;
+    }
     await db.auth.signOut();
     currentUser = null;
     document.getElementById('email').value = '';
