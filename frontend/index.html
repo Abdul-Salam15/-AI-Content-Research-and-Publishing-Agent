@@ -751,7 +751,7 @@
         id, status, scheduled_at, published_url, created_at,
         channel_outputs (
           channel, content,
-          drafts ( sections, content_requests ( raw_idea ) )
+          drafts ( sections, content_requests!content_request_id ( raw_idea ) )
         )
       `)
       .order('created_at', { ascending: false })
