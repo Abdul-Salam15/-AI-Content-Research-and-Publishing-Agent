@@ -766,6 +766,7 @@
       return;
     }
 
+    const fullTextById = {};
     const rows = data.map(row => {
       const co = row.channel_outputs;
       const article = co && co.drafts ? co.drafts : null;
@@ -781,11 +782,15 @@
       } else {
         actionHtml = `
           <div class="queue-post-row">
+            <button class="small" data-copy-id="${row.id}" style="background:var(--wire-blue)">Copy</button>
             <input type="text" placeholder="Paste live URL" id="url-${row.id}" />
             <button class="small" data-queue-id="${row.id}">Mark as posted</button>
           </div>
         `;
       }
+
+      const fullText = co && co.content ? (co.content.full_text || '') : '';
+      fullTextById[row.id] = fullText;
 
       return `
         <tr>
@@ -807,6 +812,20 @@
 
     wrap.querySelectorAll('button[data-queue-id]').forEach(btn => {
       btn.addEventListener('click', () => markAsPosted(btn.dataset.queueId));
+    });
+
+    wrap.querySelectorAll('button[data-copy-id]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const text = fullTextById[btn.dataset.copyId] || '';
+        try {
+          await navigator.clipboard.writeText(text);
+          const original = btn.textContent;
+          btn.textContent = 'Copied!';
+          setTimeout(() => { btn.textContent = original; }, 1500);
+        } catch (e) {
+          alert('Could not copy automatically. Full text:\n\n' + text);
+        }
+      });
     });
   }
 
