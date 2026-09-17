@@ -93,6 +93,49 @@
     cursor: pointer;
     text-decoration: underline;
   }
+  .sidebar nav.main-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 40px;
+  }
+  .sidebar nav.main-nav a {
+    color: #B8B4A8;
+    font-size: 14px;
+    text-decoration: none;
+    padding: 8px 0;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    padding-left: 10px;
+  }
+  .sidebar nav.main-nav a.active {
+    color: var(--newsprint);
+    border-left-color: var(--wire-blue);
+    font-weight: 500;
+  }
+
+  /* ---- Publishing queue ---- */
+  .queue-content-cell { max-width: 340px; color: var(--copy-gray); font-size: 13px; }
+  .queue-post-row { display: flex; gap: 8px; align-items: center; }
+  .queue-post-row input[type="text"] {
+    font-family: var(--sans);
+    font-size: 13px;
+    padding: 6px 8px;
+    border: 1px solid var(--rule);
+    width: 220px;
+  }
+  button.small {
+    background: var(--press-green);
+    color: #fff;
+    border: none;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .published-link { font-size: 13px; }
   .main {
     flex: 1;
     padding: 40px 48px;
@@ -293,6 +336,10 @@
 <div id="app" class="app hidden">
   <div class="sidebar">
     <div class="brand">Wire</div>
+    <nav class="main-nav">
+      <a id="nav-requests" class="active">Requests</a>
+      <a id="nav-queue">Publishing queue</a>
+    </nav>
     <div class="who">
       <strong id="who-name">—</strong>
       <span id="who-role">—</span>
@@ -300,46 +347,57 @@
     <button class="logout" id="logout-btn">Sign out</button>
   </div>
   <div class="main">
-    <div id="list-view">
-      <section id="intake-section" class="hidden">
-        <h2>New content request</h2>
-        <div class="field">
-          <label for="raw-idea">What's the idea?</label>
-          <textarea id="raw-idea" placeholder="e.g. a beginner's guide to testing webhooks"></textarea>
-        </div>
-        <div class="field">
-          <label for="target-audience">Who's it for?</label>
-          <input type="text" id="target-audience" placeholder="e.g. junior backend developers" />
-        </div>
-        <div class="field">
-          <label for="source-url">Source URL (optional)</label>
-          <input type="text" id="source-url" placeholder="https://..." />
-        </div>
-        <div class="field">
-          <label for="supporting-material">Supporting material (optional)</label>
-          <textarea id="supporting-material" placeholder="Paste any notes or reference text"></textarea>
-        </div>
-        <button class="primary" id="submit-btn">Submit for research</button>
-        <div id="submit-msg" class="form-msg"></div>
-      </section>
+    <div id="requests-view">
+      <div id="list-view">
+        <section id="intake-section" class="hidden">
+          <h2>New content request</h2>
+          <div class="field">
+            <label for="raw-idea">What's the idea?</label>
+            <textarea id="raw-idea" placeholder="e.g. a beginner's guide to testing webhooks"></textarea>
+          </div>
+          <div class="field">
+            <label for="target-audience">Who's it for?</label>
+            <input type="text" id="target-audience" placeholder="e.g. junior backend developers" />
+          </div>
+          <div class="field">
+            <label for="source-url">Source URL (optional)</label>
+            <input type="text" id="source-url" placeholder="https://..." />
+          </div>
+          <div class="field">
+            <label for="supporting-material">Supporting material (optional)</label>
+            <textarea id="supporting-material" placeholder="Paste any notes or reference text"></textarea>
+          </div>
+          <button class="primary" id="submit-btn">Submit for research</button>
+          <div id="submit-msg" class="form-msg"></div>
+        </section>
 
+        <section>
+          <h2 id="requests-heading">Requests</h2>
+          <div id="requests-table-wrap">
+            <div class="empty">Loading…</div>
+          </div>
+        </section>
+      </div>
+
+      <section id="detail-view" class="hidden">
+        <a class="back-link" id="back-to-list">← Back to requests</a>
+        <div class="request-header">
+          <h2 class="idea-title" id="detail-idea">—</h2>
+          <p class="audience" id="detail-audience">—</p>
+        </div>
+        <div class="drafts-grid" id="drafts-grid"></div>
+        <div id="action-area"></div>
+      </section>
+    </div>
+
+    <div id="queue-view" class="hidden">
       <section>
-        <h2 id="requests-heading">Requests</h2>
-        <div id="requests-table-wrap">
+        <h2>Publishing queue</h2>
+        <div id="queue-table-wrap">
           <div class="empty">Loading…</div>
         </div>
       </section>
     </div>
-
-    <section id="detail-view" class="hidden">
-      <a class="back-link" id="back-to-list">← Back to requests</a>
-      <div class="request-header">
-        <h2 class="idea-title" id="detail-idea">—</h2>
-        <p class="audience" id="detail-audience">—</p>
-      </div>
-      <div class="drafts-grid" id="drafts-grid"></div>
-      <div id="action-area"></div>
-    </section>
   </div>
 </div>
 
@@ -660,6 +718,114 @@
     }
 
     area.innerHTML = '';
+  }
+
+  // ---- View switching ----
+
+  function switchView(view) {
+    document.getElementById('nav-requests').classList.toggle('active', view === 'requests');
+    document.getElementById('nav-queue').classList.toggle('active', view === 'queue');
+    document.getElementById('requests-view').classList.toggle('hidden', view !== 'requests');
+    document.getElementById('queue-view').classList.toggle('hidden', view !== 'queue');
+    if (view === 'queue') loadQueue();
+  }
+
+  document.getElementById('nav-requests').addEventListener('click', () => switchView('requests'));
+  document.getElementById('nav-queue').addEventListener('click', () => switchView('queue'));
+
+  // ---- Publishing queue ----
+
+  function previewFor(channel, content) {
+    if (!content) return '—';
+    if (channel === 'newsletter') return content.subject_line || '—';
+    if (channel === 'linkedin') return content.cta || (content.full_text || '').slice(0, 80);
+    if (channel === 'x') return content.full_text || '—';
+    return '—';
+  }
+
+  async function loadQueue() {
+    const wrap = document.getElementById('queue-table-wrap');
+    const { data, error } = await db
+      .from('publishing_queue')
+      .select(`
+        id, status, scheduled_at, published_url, created_at,
+        channel_outputs (
+          channel, content,
+          drafts ( sections, content_requests ( raw_idea ) )
+        )
+      `)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error) {
+      wrap.innerHTML = `<div class="empty">Couldn't load the queue: ${error.message}</div>`;
+      return;
+    }
+    if (!data || data.length === 0) {
+      wrap.innerHTML = `<div class="empty">Nothing in the queue yet — approved content lands here automatically.</div>`;
+      return;
+    }
+
+    const rows = data.map(row => {
+      const co = row.channel_outputs;
+      const article = co && co.drafts ? co.drafts : null;
+      const title = article && article.sections ? (article.sections._title || '(untitled)') : '(article not visible)';
+      const channel = co ? co.channel : '—';
+      const preview = co ? previewFor(co.channel, co.content) : '—';
+
+      let actionHtml;
+      if (row.status === 'published') {
+        actionHtml = row.published_url
+          ? `<a class="published-link" href="${escapeHtml(row.published_url)}" target="_blank" rel="noopener">View live</a>`
+          : `<span class="empty">Published</span>`;
+      } else {
+        actionHtml = `
+          <div class="queue-post-row">
+            <input type="text" placeholder="Paste live URL" id="url-${row.id}" />
+            <button class="small" data-queue-id="${row.id}">Mark as posted</button>
+          </div>
+        `;
+      }
+
+      return `
+        <tr>
+          <td class="idea-cell">${escapeHtml(title)}</td>
+          <td>${escapeHtml(channel)}</td>
+          <td class="queue-content-cell">${escapeHtml(preview)}</td>
+          <td><span class="status"><span class="dot" style="background:${STATUS_COLOR[row.status] || 'var(--copy-gray)'}"></span>${row.status}</span></td>
+          <td>${actionHtml}</td>
+        </tr>
+      `;
+    }).join('');
+
+    wrap.innerHTML = `
+      <table>
+        <thead><tr><th>Article</th><th>Channel</th><th>Preview</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+
+    wrap.querySelectorAll('button[data-queue-id]').forEach(btn => {
+      btn.addEventListener('click', () => markAsPosted(btn.dataset.queueId));
+    });
+  }
+
+  async function markAsPosted(queueId) {
+    const input = document.getElementById(`url-${queueId}`);
+    const url = input.value.trim();
+    if (!url) {
+      input.style.borderColor = 'var(--redline)';
+      return;
+    }
+    const { error } = await db
+      .from('publishing_queue')
+      .update({ status: 'published', published_url: url })
+      .eq('id', queueId);
+    if (error) {
+      alert('Could not update: ' + error.message);
+      return;
+    }
+    loadQueue();
   }
 
   document.getElementById('login-btn').addEventListener('click', async () => {
