@@ -1064,10 +1064,14 @@
       <tr data-user-id="${u.id}">
         <td class="user-name-cell">${escapeHtml(u.name)}</td>
         <td>${escapeHtml(u.email || '—')}</td>
-        <td>${u.role === 'manager' ? 'Manager' : 'Content Strategist'}</td>
+        <td class="user-role-cell">${u.role === 'manager' ? 'Manager' : 'Content Strategist'}</td>
         <td>${fmtDate(u.created_at)}</td>
         <td>
-          <button class="small" data-edit-id="${u.id}" data-current-name="${escapeHtml(u.name)}" style="background:var(--wire-blue)">Edit</button>
+          <button class="small" data-edit-id="${u.id}"
+            data-current-name="${escapeHtml(u.name)}"
+            data-current-role="${u.role}"
+            data-email="${escapeHtml(u.email || '')}"
+            style="background:var(--wire-blue)">Edit</button>
           ${u.id !== currentUser.id ? `<button class="small" data-delete-id="${u.id}" data-delete-name="${escapeHtml(u.name).replace(/"/g, '&quot;')}" style="background:var(--redline)">Delete</button>` : ''}
         </td>
       </tr>
@@ -1081,36 +1085,80 @@
     `;
 
     wrap.querySelectorAll('button[data-edit-id]').forEach(btn => {
-      btn.addEventListener('click', () => startEditName(btn.dataset.editId, btn.dataset.currentName));
+      btn.addEventListener('click', () => startEditUser(
+        btn.dataset.editId, btn.dataset.currentName, btn.dataset.currentRole, btn.dataset.email
+      ));
     });
     wrap.querySelectorAll('button[data-delete-id]').forEach(btn => {
       btn.addEventListener('click', () => deleteUser(btn.dataset.deleteId, btn.dataset.deleteName));
     });
   }
 
-  function startEditName(userId, currentName) {
+  const N8N_ROLE_CHANGED_URL = 'https://pod1.app.n8n.cloud/webhook/36a2f6b3-df83-4f5a-a586-5ae0292c8f63';
+
+  function startEditUser(userId, currentName, currentRole, userEmail) {
     const row = document.querySelector(`tr[data-user-id="${userId}"]`);
     const nameCell = row.querySelector('.user-name-cell');
+    const roleCell = row.querySelector('.user-role-cell');
+
     nameCell.innerHTML = `
       <input type="text" id="edit-name-${userId}" value="${escapeHtml(currentName)}"
-        style="width:140px; font-family:var(--sans); font-size:14px; padding:4px 6px; border:1px solid var(--rule);" />
-      <button class="small" data-save-id="${userId}" style="background:var(--press-green); margin-left:4px;">Save</button>
+        style="width:120px; font-family:var(--sans); font-size:14px; padding:4px 6px; border:1px solid var(--rule);" />
     `;
-    document.querySelector(`button[data-save-id="${userId}"]`).addEventListener('click', () => saveEditedName(userId));
+
+    if (userId === currentUser.id) {
+      roleCell.innerHTML = `<span style="color:var(--copy-gray); font-size:13px;">Can't change own role</span>`;
+    } else {
+      roleCell.innerHTML = `
+        <select id="edit-role-${userId}" style="font-family:var(--sans); font-size:14px; padding:4px 6px; border:1px solid var(--rule);">
+          <option value="content_strategist" ${currentRole === 'content_strategist' ? 'selected' : ''}>Content Strategist</option>
+          <option value="manager" ${currentRole === 'manager' ? 'selected' : ''}>Manager</option>
+        </select>
+      `;
+    }
+
+    const actionsCell = row.children[4];
+    actionsCell.innerHTML = `<button class="small" data-save-id="${userId}" style="background:var(--press-green);">Save</button>`;
+    document.querySelector(`button[data-save-id="${userId}"]`).addEventListener('click', () =>
+      saveEditedUser(userId, currentRole, userEmail)
+    );
   }
 
-  async function saveEditedName(userId) {
-    const input = document.getElementById(`edit-name-${userId}`);
-    const newName = input.value.trim();
+  async function saveEditedUser(userId, previousRole, userEmail) {
+    const nameInput = document.getElementById(`edit-name-${userId}`);
+    const newName = nameInput.value.trim();
     if (!newName) {
       alert('Name cannot be empty.');
       return;
     }
-    const { error } = await db.from('users').update({ name: newName }).eq('id', userId);
-    if (error) {
-      alert('Could not update name: ' + error.message);
+
+    const { error: nameError } = await db.from('users').update({ name: newName }).eq('id', userId);
+    if (nameError) {
+      alert('Could not update name: ' + nameError.message);
       return;
     }
+
+    const roleSelect = document.getElementById(`edit-role-${userId}`);
+    if (roleSelect) {
+      const newRole = roleSelect.value;
+      if (newRole !== previousRole) {
+        const { error: roleError } = await db.rpc('set_user_role', {
+          target_user_id: userId, new_role: newRole
+        });
+        if (roleError) {
+          alert('Could not update role: ' + roleError.message);
+          return;
+        }
+        if (userEmail) {
+          fetch(N8N_ROLE_CHANGED_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: userEmail, name: newName, newRole })
+          }).catch(() => {}); // best-effort — don't block the UI if this fails
+        }
+      }
+    }
+
     loadUsers();
   }
 
