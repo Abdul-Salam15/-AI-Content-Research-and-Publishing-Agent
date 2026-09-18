@@ -493,11 +493,31 @@
            d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   }
 
-  async function checkSession() {
-    const { data: { session } } = await db.auth.getSession();
-    if (session && isInviteFlow) {
+  let inviteSessionReady = false;
+
+  db.auth.onAuthStateChange((event, session) => {
+    if (isInviteFlow && session && !inviteSessionReady) {
+      inviteSessionReady = true;
       showSetPasswordScreen();
-    } else if (session) {
+    }
+  });
+
+  async function checkSession() {
+    if (isInviteFlow) {
+      // Don't race the SDK's own processing of the invite token in the URL —
+      // onAuthStateChange above will fire once it's genuinely ready.
+      setTimeout(() => {
+        if (!inviteSessionReady) {
+          showLogin();
+          const msg = document.getElementById('login-msg');
+          msg.textContent = 'This invite link may have expired or already been used. Please ask for a new invite.';
+          msg.className = 'form-msg error';
+        }
+      }, 8000);
+      return;
+    }
+    const { data: { session } } = await db.auth.getSession();
+    if (session) {
       await onSignedIn(session.user.id);
     } else {
       showLogin();
