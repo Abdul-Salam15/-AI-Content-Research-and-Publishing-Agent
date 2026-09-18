@@ -6,7 +6,1128 @@
 <title>AI Content Delivery Pipeline</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+P<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Content Delivery Pipeline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Serif:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root {
+    --ink: #1C1B19;
+    --newsprint: #F1EDE4;
+    --wire-blue: #2F5D82;
+    --press-green: #3E6B4F;
+    --redline: #A23B2E;
+    --copy-gray: #7C7A73;
+    --rule: #DAD5C8;
+    --sans: 'IBM Plex Sans', system-ui, sans-serif;
+    --serif: 'IBM Plex Serif', Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    background: var(--newsprint);
+    color: var(--ink);
+    font-weight: 400;
+  }
+  a { color: var(--wire-blue); }
+
+  /* ---- Login ---- */
+  .login-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .login-card {
+    width: 100%;
+    max-width: 340px;
+    padding: 40px 32px;
+    border: 1px solid var(--rule);
+    background: #fff;
+  }
+  .login-card h1 {
+    font-size: 20px;
+    font-weight: 500;
+    margin: 0 0 4px;
+  }
+  .login-card p.sub {
+    color: var(--copy-gray);
+    font-size: 14px;
+    margin: 0 0 24px;
+  }
+
+  /* ---- Layout ---- */
+  .app {
+    display: flex;
+    min-height: 100vh;
+  }
+  .sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--ink);
+    color: var(--newsprint);
+    display: flex;
+    flex-direction: column;
+    padding: 24px 20px;
+  }
+  .sidebar .brand {
+    font-family: var(--serif);
+    font-size: 15px;
+    line-height: 1.3;
+    margin-bottom: 40px;
+  }
+  .sidebar .who {
+    margin-top: auto;
+    font-size: 13px;
+    color: #B8B4A8;
+    border-top: 1px solid #35332F;
+    padding-top: 16px;
+  }
+  .sidebar .who strong { color: var(--newsprint); display: block; font-weight: 500; }
+  .sidebar button.logout {
+    margin-top: 12px;
+    background: none;
+    border: none;
+    color: #B8B4A8;
+    font-family: var(--sans);
+    font-size: 13px;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .sidebar nav.main-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 40px;
+  }
+  .sidebar nav.main-nav a {
+    color: #B8B4A8;
+    font-size: 14px;
+    text-decoration: none;
+    padding: 8px 0;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    padding-left: 10px;
+  }
+  .sidebar nav.main-nav a.active {
+    color: var(--newsprint);
+    border-left-color: var(--wire-blue);
+    font-weight: 500;
+  }
+
+  /* ---- Publishing queue ---- */
+  .queue-content-cell { max-width: 340px; color: var(--copy-gray); font-size: 13px; }
+  .queue-post-row { display: flex; gap: 8px; align-items: center; }
+  .queue-post-row input[type="text"] {
+    font-family: var(--sans);
+    font-size: 13px;
+    padding: 6px 8px;
+    border: 1px solid var(--rule);
+    width: 220px;
+  }
+  button.small {
+    background: var(--press-green);
+    color: #fff;
+    border: none;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .published-link { font-size: 13px; }
+  .main {
+    flex: 1;
+    padding: 40px 48px;
+    max-width: 900px;
+  }
+  h2 {
+    font-size: 15px;
+    font-weight: 500;
+    margin: 0 0 16px;
+    color: var(--ink);
+  }
+  section { margin-bottom: 48px; }
+
+  /* ---- Form ---- */
+  .field { margin-bottom: 16px; }
+  .field label {
+    display: block;
+    font-size: 13px;
+    color: var(--copy-gray);
+    margin-bottom: 6px;
+  }
+  .field input, .field textarea, .field select {
+    width: 100%;
+    max-width: 520px;
+    font-family: var(--sans);
+    font-size: 14px;
+    padding: 9px 10px;
+    border: 1px solid var(--rule);
+    background: #fff;
+    color: var(--ink);
+  }
+  .field textarea { resize: vertical; min-height: 64px; }
+  button.primary {
+    background: var(--wire-blue);
+    color: #fff;
+    border: none;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 500;
+    padding: 10px 18px;
+    cursor: pointer;
+  }
+  button.primary:disabled { opacity: 0.5; cursor: default; }
+  .form-msg { font-size: 13px; margin-top: 10px; }
+  .form-msg.error { color: var(--redline); }
+  .form-msg.ok { color: var(--press-green); }
+
+  /* ---- Table ---- */
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    text-align: left;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--copy-gray);
+    padding: 8px 12px 8px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  td {
+    font-size: 14px;
+    padding: 12px 12px 12px 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  .idea-cell { max-width: 320px; }
+  .status { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .empty { color: var(--copy-gray); font-size: 14px; padding: 16px 0; }
+
+  .hidden { display: none; }
+
+  /* ---- Detail view ---- */
+  tr.clickable { cursor: pointer; }
+  tr.clickable:hover td { background: #fff; }
+
+  .back-link {
+    display: inline-block;
+    font-size: 13px;
+    color: var(--wire-blue);
+    text-decoration: none;
+    margin-bottom: 24px;
+    cursor: pointer;
+  }
+  .request-header h2.idea-title {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 500;
+    margin: 0 0 4px;
+  }
+  .request-header .audience {
+    color: var(--copy-gray);
+    font-size: 14px;
+    margin: 0 0 32px;
+  }
+  .drafts-grid {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-bottom: 32px;
+  }
+  .draft-card {
+    flex: 1;
+    min-width: 320px;
+    max-width: 480px;
+    background: #fff;
+    border: 1px solid var(--rule);
+    padding: 24px;
+  }
+  .draft-card.selected { border-color: var(--wire-blue); border-width: 2px; padding: 23px; }
+  .draft-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .draft-card-header .option-label { font-size: 12px; color: var(--copy-gray); }
+  .draft-title {
+    font-family: var(--serif);
+    font-size: 18px;
+    font-weight: 500;
+    margin: 0 0 8px;
+  }
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    border: 1px solid var(--wire-blue);
+    color: var(--wire-blue);
+    padding: 2px 6px;
+    margin-bottom: 12px;
+  }
+  .article-body {
+    font-family: var(--serif);
+    font-size: 15px;
+    line-height: 1.6;
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 8px;
+    margin-bottom: 16px;
+  }
+  .article-body h4 {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink);
+    margin: 16px 0 4px;
+  }
+  .article-body h4:first-child { margin-top: 0; }
+  .article-body p { margin: 0 0 8px; }
+  .eval-block {
+    border-top: 1px solid var(--rule);
+    padding-top: 12px;
+    font-size: 13px;
+  }
+  .eval-block .criterion-row { display: flex; justify-content: space-between; padding: 3px 0; }
+  .eval-block .score-weak { color: var(--redline); }
+  .eval-block .score-adequate { color: var(--wire-blue); }
+  .eval-block .score-strong { color: var(--press-green); }
+  .eval-block .recommended { margin-top: 8px; color: var(--copy-gray); }
+  .select-row {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--rule);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .select-row label { font-size: 13px; cursor: pointer; }
+  .action-bar { background: #fff; border: 1px solid var(--rule); padding: 24px; max-width: 520px; }
+  .action-buttons { display: flex; gap: 10px; margin-top: 12px; }
+  button.secondary {
+    background: none; border: 1px solid var(--redline); color: var(--redline);
+    font-family: var(--sans); font-size: 14px; font-weight: 500; padding: 10px 18px; cursor: pointer;
+  }
+  button.tertiary {
+    background: none; border: 1px solid var(--copy-gray); color: var(--ink);
+    font-family: var(--sans); font-size: 14px; font-weight: 500; padding: 10px 18px; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="login-screen" class="login-screen">
+  <div class="login-card">
+    <h1>AI Content Delivery Pipeline</h1>
+    <p class="sub">Sign in to continue.</p>
+    <div class="field">
+      <label for="email">Email</label>
+      <input type="email" id="email" autocomplete="username" />
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" autocomplete="current-password" />
+    </div>
+    <button class="primary" id="login-btn">Sign in</button>
+    <div id="login-msg" class="form-msg"></div>
+  </div>
+</div>
+
+<div id="app" class="app hidden">
+  <div class="sidebar">
+    <div class="brand">AI Content Delivery Pipeline</div>
+    <nav class="main-nav">
+      <a id="nav-requests" class="active">Requests</a>
+      <a id="nav-queue">Publishing queue</a>
+      <a id="nav-invite" class="hidden">Invite user</a>
+      <a id="nav-users" class="hidden">Users</a>
+    </nav>
+    <div class="who">
+      <strong id="who-name">—</strong>
+      <span id="who-role">—</span>
+    </div>
+    <button class="logout" id="logout-btn">Sign out</button>
+  </div>
+  <div class="main">
+    <div id="requests-view">
+      <div id="list-view">
+        <section id="intake-section" class="hidden">
+          <h2>New content request</h2>
+          <div class="field">
+            <label for="raw-idea">What's the idea?</label>
+            <textarea id="raw-idea" placeholder="e.g. a beginner's guide to testing webhooks"></textarea>
+          </div>
+          <div class="field">
+            <label for="target-audience">Who's it for?</label>
+            <input type="text" id="target-audience" placeholder="e.g. junior backend developers" />
+          </div>
+          <div class="field">
+            <label for="source-url">Source URL (optional)</label>
+            <input type="text" id="source-url" placeholder="https://..." />
+          </div>
+          <div class="field">
+            <label for="supporting-material">Supporting material (optional)</label>
+            <textarea id="supporting-material" placeholder="Paste any notes or reference text"></textarea>
+          </div>
+          <button class="primary" id="submit-btn">Submit for research</button>
+          <div id="submit-msg" class="form-msg"></div>
+        </section>
+
+        <section>
+          <h2 id="requests-heading">Requests</h2>
+          <div id="requests-table-wrap">
+            <div class="empty">Loading…</div>
+          </div>
+        </section>
+      </div>
+
+      <section id="detail-view" class="hidden">
+        <a class="back-link" id="back-to-list">← Back to requests</a>
+        <div class="request-header">
+          <h2 class="idea-title" id="detail-idea">—</h2>
+          <p class="audience" id="detail-audience">—</p>
+        </div>
+        <div class="drafts-grid" id="drafts-grid"></div>
+        <div id="action-area"></div>
+      </section>
+    </div>
+
+    <div id="queue-view" class="hidden">
+      <section>
+        <h2>Publishing queue</h2>
+        <div id="queue-table-wrap">
+          <div class="empty">Loading…</div>
+        </div>
+      </section>
+    </div>
+
+    <div id="invite-view" class="hidden">
+      <section>
+        <h2>Invite a new user</h2>
+        <div class="field">
+          <label for="invite-name">Name</label>
+          <input type="text" id="invite-name" />
+        </div>
+        <div class="field">
+          <label for="invite-email">Email</label>
+          <input type="email" id="invite-email" />
+        </div>
+        <div class="field">
+          <label for="invite-role">Role</label>
+          <select id="invite-role">
+            <option value="content_strategist">Content Strategist</option>
+            <option value="manager">Manager</option>
+          </select>
+        </div>
+        <button class="primary" id="send-invite-btn">Send invite</button>
+        <div id="invite-msg" class="form-msg"></div>
+      </section>
+    </div>
+
+    <div id="users-view" class="hidden">
+      <section>
+        <h2>Users</h2>
+        <div id="users-table-wrap">
+          <div class="empty">Loading…</div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Fill in your project's anon/public key below — find it in
+  // Supabase → Settings → API → Project API keys → "anon" "public".
+  const SUPABASE_URL = 'https://evyppmzyjmzmrlirlmes.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2eXBwbXp5am16bXJsaXJsbWVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1MDU3MDYsImV4cCI6MjEwNTA4MTcwNn0.74y93Rms37hsPs5j8vUJvGqgEw5cMeKWLHhS7maYA8c';
+
+  const { createClient } = supabase;
+  const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const STATUS_LABELS = {
+    draft: 'Draft', rate_limited: 'Rate limited', researching: 'Researching',
+    needs_more_context: 'Needs more context', drafting: 'Drafting',
+    evaluating: 'Evaluating', needs_revision: 'Needs revision',
+    ready_for_review: 'Ready for review', pending_approval: 'Pending approval',
+    approved: 'Approved', rejected: 'Rejected', queued: 'Queued', failed: 'Failed'
+  };
+  const STATUS_COLOR = {
+    draft: 'var(--copy-gray)', rate_limited: 'var(--redline)',
+    researching: 'var(--wire-blue)', needs_more_context: 'var(--redline)',
+    drafting: 'var(--wire-blue)', evaluating: 'var(--wire-blue)',
+    needs_revision: 'var(--wire-blue)', ready_for_review: 'var(--wire-blue)',
+    pending_approval: 'var(--wire-blue)', approved: 'var(--press-green)',
+    rejected: 'var(--redline)', queued: 'var(--press-green)', failed: 'var(--redline)',
+    pass: 'var(--press-green)', revise: 'var(--wire-blue)', reject: 'var(--redline)'
+  };
+
+  let currentUser = null; // { id, name, role }
+  let currentDetailRequestId = null;
+  let realtimeChannel = null;
+
+  function fmtDate(iso) {
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' +
+           d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  }
+
+  async function checkSession() {
+    const { data: { session } } = await db.auth.getSession();
+    if (session) {
+      await onSignedIn(session.user.id);
+    } else {
+      showLogin();
+    }
+  }
+
+  function showLogin() {
+    document.getElementById('login-screen').classList.remove('hidden');
+    document.getElementById('app').classList.add('hidden');
+  }
+
+  async function onSignedIn(userId) {
+    const { data: profile, error } = await db
+      .from('users')
+      .select('name, role')
+      .eq('id', userId)
+      .single();
+
+    if (error || !profile) {
+      document.getElementById('login-msg').textContent =
+        'Signed in, but no matching profile row was found for this account.';
+      document.getElementById('login-msg').className = 'form-msg error';
+      await db.auth.signOut();
+      return;
+    }
+
+    currentUser = { id: userId, name: profile.name, role: profile.role };
+
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    document.getElementById('who-name').textContent = currentUser.name;
+    document.getElementById('who-role').textContent =
+      currentUser.role === 'content_strategist' ? 'Content Strategist' : 'Manager';
+
+    document.getElementById('requests-heading').textContent =
+      currentUser.role === 'manager' ? 'All requests' : 'Your requests';
+
+    if (currentUser.role === 'content_strategist') {
+      document.getElementById('intake-section').classList.remove('hidden');
+    }
+
+    if (currentUser.role === 'manager') {
+      document.getElementById('nav-invite').classList.remove('hidden');
+      document.getElementById('nav-users').classList.remove('hidden');
+    }
+
+    subscribeToRequestChanges();
+    loadRequests();
+  }
+
+  function subscribeToRequestChanges() {
+    if (realtimeChannel) return; // already subscribed this session
+    realtimeChannel = db
+      .channel('content_requests_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'content_requests' }, () => {
+        const inRequestsView = !document.getElementById('requests-view').classList.contains('hidden');
+        const inDetail = !document.getElementById('detail-view').classList.contains('hidden');
+        if (inRequestsView && inDetail && currentDetailRequestId) {
+          openDetail(currentDetailRequestId);
+        } else if (inRequestsView) {
+          loadRequests();
+        }
+      })
+      .subscribe();
+  }
+
+  async function loadRequests() {
+    const wrap = document.getElementById('requests-table-wrap');
+    const { data, error } = await db
+      .from('content_requests')
+      .select('id, raw_idea, target_audience, status, created_at')
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      wrap.innerHTML = `<div class="empty">Couldn't load requests: ${error.message}</div>`;
+      return;
+    }
+    if (!data || data.length === 0) {
+      wrap.innerHTML = `<div class="empty">No requests yet — submit one above to get started.</div>`;
+      return;
+    }
+
+    const rows = data.map(r => `
+      <tr class="clickable" data-id="${r.id}">
+        <td class="idea-cell">${escapeHtml(r.raw_idea)}</td>
+        <td>${escapeHtml(r.target_audience)}</td>
+        <td><span class="status"><span class="dot" style="background:${STATUS_COLOR[r.status] || 'var(--copy-gray)'}"></span>${STATUS_LABELS[r.status] || r.status}</span></td>
+        <td>${fmtDate(r.created_at)}</td>
+      </tr>
+    `).join('');
+
+    wrap.innerHTML = `
+      <table>
+        <thead><tr><th>Idea</th><th>Audience</th><th>Status</th><th>Submitted</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
+  }
+
+  // ---- Detail view ----
+
+  document.getElementById('requests-table-wrap').addEventListener('click', (e) => {
+    const tr = e.target.closest('tr[data-id]');
+    if (tr) openDetail(tr.dataset.id);
+  });
+
+  document.getElementById('back-to-list').addEventListener('click', closeDetail);
+
+  function closeDetail() {
+    currentDetailRequestId = null;
+    document.getElementById('detail-view').classList.add('hidden');
+    document.getElementById('list-view').classList.remove('hidden');
+    loadRequests();
+  }
+
+  async function openDetail(requestId) {
+    currentDetailRequestId = requestId;
+    document.getElementById('list-view').classList.add('hidden');
+    document.getElementById('detail-view').classList.remove('hidden');
+    document.getElementById('drafts-grid').innerHTML = '<div class="empty">Loading…</div>';
+    document.getElementById('action-area').innerHTML = '';
+
+    const { data: request, error: reqErr } = await db
+      .from('content_requests')
+      .select('*')
+      .eq('id', requestId)
+      .single();
+
+    if (reqErr || !request) {
+      document.getElementById('drafts-grid').innerHTML = `<div class="empty">Couldn't load this request.</div>`;
+      return;
+    }
+
+    document.getElementById('detail-idea').textContent = request.raw_idea;
+    document.getElementById('detail-audience').textContent = request.target_audience;
+
+    const { data: drafts } = await db
+      .from('drafts')
+      .select('id, option_number, primary_keyword, image_brief, sections, eval_status')
+      .eq('content_request_id', requestId)
+      .order('option_number', { ascending: true });
+
+    const draftIds = (drafts || []).map(d => d.id);
+    const evaluationsByDraft = {};
+    if (draftIds.length > 0) {
+      const { data: evals } = await db
+        .from('evaluations')
+        .select('draft_id, version_number, overall_status, criteria_scores, weak_claims, recommended_changes')
+        .in('draft_id', draftIds)
+        .order('version_number', { ascending: false });
+      (evals || []).forEach(e => {
+        if (!evaluationsByDraft[e.draft_id]) evaluationsByDraft[e.draft_id] = e; // first seen = latest version
+      });
+    }
+
+    renderDrafts(request, drafts || [], evaluationsByDraft);
+    renderActionArea(request);
+  }
+
+  function renderDrafts(request, drafts, evaluationsByDraft) {
+    const grid = document.getElementById('drafts-grid');
+    if (drafts.length === 0) {
+      grid.innerHTML = '<div class="empty">No drafts yet — still in the pipeline.</div>';
+      return;
+    }
+
+    const canSelect = currentUser.role === 'content_strategist' &&
+      ['ready_for_review', 'needs_revision'].includes(request.status);
+
+    grid.innerHTML = drafts.map(d => {
+      const isSelected = request.selected_draft_id === d.id;
+      const title = (d.sections && d.sections._title) || '(untitled)';
+      const sectionsHtml = Object.entries(d.sections || {})
+        .filter(([k]) => k !== '_title')
+        .map(([name, val]) => `<h4>${escapeHtml(name)}</h4><p>${escapeHtml(val.content)}</p>`)
+        .join('');
+
+      const evalu = evaluationsByDraft[d.id];
+      const evalHtml = evalu ? `
+        <div class="eval-block">
+          ${evalu.criteria_scores.map(c =>
+            `<div class="criterion-row"><span>${escapeHtml(c.criterion)}</span><span class="score-${c.score}">${c.score}</span></div>`
+          ).join('')}
+          ${evalu.recommended_changes ? `<p class="recommended">${escapeHtml(evalu.recommended_changes)}</p>` : ''}
+        </div>
+      ` : '<div class="eval-block">No evaluation yet.</div>';
+
+      return `
+        <div class="draft-card ${isSelected ? 'selected' : ''}">
+          <div class="draft-card-header">
+            <span class="option-label">Option ${d.option_number}</span>
+            <span class="status"><span class="dot" style="background:${STATUS_COLOR[d.eval_status] || 'var(--copy-gray)'}"></span>${d.eval_status || 'pending'}</span>
+          </div>
+          <div class="tag">AI-inferred keyword: ${escapeHtml(d.primary_keyword || '—')}</div>
+          <div class="draft-title">${escapeHtml(title)}</div>
+          <div class="article-body">${sectionsHtml}</div>
+          ${evalHtml}
+          ${canSelect ? `
+            <div class="select-row">
+              <input type="radio" name="option-select" id="opt-${d.id}" value="${d.id}" ${isSelected ? 'checked' : ''}>
+              <label for="opt-${d.id}">Select this option</label>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+
+  function renderActionArea(request) {
+    const area = document.getElementById('action-area');
+
+    if (currentUser.role === 'content_strategist' &&
+        ['ready_for_review', 'needs_revision'].includes(request.status)) {
+      area.innerHTML = `
+        <button class="primary" id="submit-approval-btn">Submit for approval</button>
+        <div id="detail-msg" class="form-msg"></div>
+      `;
+      document.getElementById('submit-approval-btn').addEventListener('click', async () => {
+        const selected = document.querySelector('input[name="option-select"]:checked');
+        const msg = document.getElementById('detail-msg');
+        if (!selected) {
+          msg.textContent = 'Pick one of the two options first.';
+          msg.className = 'form-msg error';
+          return;
+        }
+        const { error } = await db
+          .from('content_requests')
+          .update({ selected_draft_id: selected.value, status: 'pending_approval' })
+          .eq('id', request.id);
+        if (error) {
+          msg.textContent = 'Could not submit: ' + error.message;
+          msg.className = 'form-msg error';
+          return;
+        }
+        msg.textContent = 'Submitted for approval.';
+        msg.className = 'form-msg ok';
+        setTimeout(closeDetail, 800);
+      });
+      return;
+    }
+
+    if (currentUser.role === 'manager' && request.status === 'pending_approval') {
+      area.innerHTML = `
+        <div class="action-bar">
+          <div class="field">
+            <label for="approval-comment">Comment (required if rejecting or requesting revision)</label>
+            <textarea id="approval-comment"></textarea>
+          </div>
+          <div class="action-buttons">
+            <button class="primary" id="approve-btn">Approve</button>
+            <button class="tertiary" id="revise-btn">Request revision</button>
+            <button class="secondary" id="reject-btn">Reject</button>
+          </div>
+          <div id="detail-msg" class="form-msg"></div>
+        </div>
+      `;
+
+      const decide = async (decision) => {
+        const comment = document.getElementById('approval-comment').value.trim();
+        const msg = document.getElementById('detail-msg');
+        if (decision !== 'approved' && !comment) {
+          msg.textContent = 'A comment is required for this decision.';
+          msg.className = 'form-msg error';
+          return;
+        }
+        const { error: apprErr } = await db.from('approvals').insert({
+          content_request_id: request.id,
+          approver_id: currentUser.id,
+          decision,
+          comment: comment || null
+        });
+        if (apprErr) {
+          msg.textContent = 'Could not record decision: ' + apprErr.message;
+          msg.className = 'form-msg error';
+          return;
+        }
+        const newStatus = decision === 'approved' ? 'approved' : decision === 'rejected' ? 'rejected' : 'needs_revision';
+        const { error: updErr } = await db
+          .from('content_requests')
+          .update({ status: newStatus })
+          .eq('id', request.id);
+        if (updErr) {
+          msg.textContent = 'Decision recorded, but status update failed: ' + updErr.message;
+          msg.className = 'form-msg error';
+          return;
+        }
+        msg.textContent = 'Decision recorded.';
+        msg.className = 'form-msg ok';
+        setTimeout(closeDetail, 800);
+      };
+
+      document.getElementById('approve-btn').addEventListener('click', () => decide('approved'));
+      document.getElementById('revise-btn').addEventListener('click', () => decide('needs_revision'));
+      document.getElementById('reject-btn').addEventListener('click', () => decide('rejected'));
+      return;
+    }
+
+    area.innerHTML = '';
+  }
+
+  // ---- View switching ----
+
+  function switchView(view) {
+    document.getElementById('nav-requests').classList.toggle('active', view === 'requests');
+    document.getElementById('nav-queue').classList.toggle('active', view === 'queue');
+    document.getElementById('nav-invite').classList.toggle('active', view === 'invite');
+    document.getElementById('nav-users').classList.toggle('active', view === 'users');
+    document.getElementById('requests-view').classList.toggle('hidden', view !== 'requests');
+    document.getElementById('queue-view').classList.toggle('hidden', view !== 'queue');
+    document.getElementById('invite-view').classList.toggle('hidden', view !== 'invite');
+    document.getElementById('users-view').classList.toggle('hidden', view !== 'users');
+    if (view === 'queue') loadQueue();
+    if (view === 'users') loadUsers();
+  }
+
+  document.getElementById('nav-requests').addEventListener('click', () => switchView('requests'));
+  document.getElementById('nav-queue').addEventListener('click', () => switchView('queue'));
+  document.getElementById('nav-invite').addEventListener('click', () => switchView('invite'));
+  document.getElementById('nav-users').addEventListener('click', () => switchView('users'));
+
+  // ---- Users (manager only) ----
+
+  async function loadUsers() {
+    const wrap = document.getElementById('users-table-wrap');
+    const { data, error } = await db
+      .from('users')
+      .select('id, name, email, role, created_at')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      wrap.innerHTML = `<div class="empty">Couldn't load users: ${error.message}</div>`;
+      return;
+    }
+    if (!data || data.length === 0) {
+      wrap.innerHTML = `<div class="empty">No users found.</div>`;
+      return;
+    }
+
+    const rows = data.map(u => `
+      <tr data-user-id="${u.id}">
+        <td class="user-name-cell">${escapeHtml(u.name)}</td>
+        <td>${escapeHtml(u.email || '—')}</td>
+        <td>${u.role === 'manager' ? 'Manager' : 'Content Strategist'}</td>
+        <td>${fmtDate(u.created_at)}</td>
+        <td>
+          <button class="small" data-edit-id="${u.id}" data-current-name="${escapeHtml(u.name)}" style="background:var(--wire-blue)">Edit</button>
+          ${u.id !== currentUser.id ? `<button class="small" data-delete-id="${u.id}" data-delete-name="${escapeHtml(u.name).replace(/"/g, '&quot;')}" style="background:var(--redline)">Delete</button>` : ''}
+        </td>
+      </tr>
+    `).join('');
+
+    wrap.innerHTML = `
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+
+    wrap.querySelectorAll('button[data-edit-id]').forEach(btn => {
+      btn.addEventListener('click', () => startEditName(btn.dataset.editId, btn.dataset.currentName));
+    });
+    wrap.querySelectorAll('button[data-delete-id]').forEach(btn => {
+      btn.addEventListener('click', () => deleteUser(btn.dataset.deleteId, btn.dataset.deleteName));
+    });
+  }
+
+  function startEditName(userId, currentName) {
+    const row = document.querySelector(`tr[data-user-id="${userId}"]`);
+    const nameCell = row.querySelector('.user-name-cell');
+    nameCell.innerHTML = `
+      <input type="text" id="edit-name-${userId}" value="${escapeHtml(currentName)}"
+        style="width:140px; font-family:var(--sans); font-size:14px; padding:4px 6px; border:1px solid var(--rule);" />
+      <button class="small" data-save-id="${userId}" style="background:var(--press-green); margin-left:4px;">Save</button>
+    `;
+    document.querySelector(`button[data-save-id="${userId}"]`).addEventListener('click', () => saveEditedName(userId));
+  }
+
+  async function saveEditedName(userId) {
+    const input = document.getElementById(`edit-name-${userId}`);
+    const newName = input.value.trim();
+    if (!newName) {
+      alert('Name cannot be empty.');
+      return;
+    }
+    const { error } = await db.from('users').update({ name: newName }).eq('id', userId);
+    if (error) {
+      alert('Could not update name: ' + error.message);
+      return;
+    }
+    loadUsers();
+  }
+
+  async function deleteUser(userId, name) {
+    const confirmed = confirm(`Delete ${name}? This removes their access to the app immediately. This cannot be undone.`);
+    if (!confirmed) return;
+
+    const { error } = await db.from('users').delete().eq('id', userId);
+    if (error) {
+      alert('Could not delete user: ' + error.message);
+      return;
+    }
+    loadUsers();
+  }
+
+  // ---- Invite user ----
+
+  const N8N_INVITE_URL = 'https://pod1.app.n8n.cloud/webhook/invite-user';
+
+  document.getElementById('send-invite-btn').addEventListener('click', async () => {
+    const name = document.getElementById('invite-name').value.trim();
+    const email = document.getElementById('invite-email').value.trim();
+    const role = document.getElementById('invite-role').value;
+    const msg = document.getElementById('invite-msg');
+    const btn = document.getElementById('send-invite-btn');
+
+    if (!name || !email) {
+      msg.textContent = 'Name and email are both required.';
+      msg.className = 'form-msg error';
+      return;
+    }
+
+    btn.disabled = true;
+    msg.textContent = 'Sending…';
+    msg.className = 'form-msg';
+
+    try {
+      const res = await fetch(N8N_INVITE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, role })
+      });
+      const data = await res.json().catch(() => ({}));
+      btn.disabled = false;
+
+      if (!res.ok || !data.success) {
+        msg.textContent = 'Could not send invite: ' + (data.message || res.statusText);
+        msg.className = 'form-msg error';
+        return;
+      }
+
+      msg.textContent = data.message || 'Invite sent!';
+      msg.className = 'form-msg ok';
+      document.getElementById('invite-name').value = '';
+      document.getElementById('invite-email').value = '';
+    } catch (e) {
+      btn.disabled = false;
+      msg.textContent = 'Could not reach the invite service: ' + e.message;
+      msg.className = 'form-msg error';
+    }
+  });
+
+  // ---- Publishing queue ----
+
+  function previewFor(channel, content) {
+    if (!content) return '—';
+    if (channel === 'newsletter') return content.subject_line || '—';
+    if (channel === 'linkedin') return content.cta || (content.full_text || '').slice(0, 80);
+    if (channel === 'x') return content.full_text || '—';
+    return '—';
+  }
+
+  async function loadQueue() {
+    const wrap = document.getElementById('queue-table-wrap');
+    const { data, error } = await db
+      .from('publishing_queue')
+      .select(`
+        id, status, scheduled_at, published_url, created_at,
+        channel_outputs (
+          channel, content,
+          drafts ( sections, content_requests!content_request_id ( raw_idea ) )
+        )
+      `)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error) {
+      wrap.innerHTML = `<div class="empty">Couldn't load the queue: ${error.message}</div>`;
+      return;
+    }
+    if (!data || data.length === 0) {
+      wrap.innerHTML = `<div class="empty">Nothing in the queue yet — approved content lands here automatically.</div>`;
+      return;
+    }
+
+    const fullTextById = {};
+    const rows = data.map(row => {
+      const co = row.channel_outputs;
+      const article = co && co.drafts ? co.drafts : null;
+      const title = article && article.sections ? (article.sections._title || '(untitled)') : '(article not visible)';
+      const channel = co ? co.channel : '—';
+      const preview = co ? previewFor(co.channel, co.content) : '—';
+
+      let actionHtml;
+      if (row.status === 'published') {
+        actionHtml = row.published_url
+          ? `<a class="published-link" href="${escapeHtml(row.published_url)}" target="_blank" rel="noopener">View live</a>`
+          : `<span class="empty">Published</span>`;
+      } else {
+        actionHtml = `
+          <div class="queue-post-row">
+            <button class="small" data-copy-id="${row.id}" style="background:var(--wire-blue)">Copy</button>
+            <input type="text" placeholder="Paste live URL" id="url-${row.id}" />
+            <button class="small" data-queue-id="${row.id}">Mark as posted</button>
+          </div>
+        `;
+      }
+
+      const fullText = co && co.content ? (co.content.full_text || '') : '';
+      fullTextById[row.id] = fullText;
+
+      return `
+        <tr>
+          <td class="idea-cell">${escapeHtml(title)}</td>
+          <td>${escapeHtml(channel)}</td>
+          <td class="queue-content-cell">${escapeHtml(preview)}</td>
+          <td><span class="status"><span class="dot" style="background:${STATUS_COLOR[row.status] || 'var(--copy-gray)'}"></span>${row.status}</span></td>
+          <td>${actionHtml}</td>
+        </tr>
+      `;
+    }).join('');
+
+    wrap.innerHTML = `
+      <table>
+        <thead><tr><th>Article</th><th>Channel</th><th>Preview</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+
+    wrap.querySelectorAll('button[data-queue-id]').forEach(btn => {
+      btn.addEventListener('click', () => markAsPosted(btn.dataset.queueId));
+    });
+
+    wrap.querySelectorAll('button[data-copy-id]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const text = fullTextById[btn.dataset.copyId] || '';
+        try {
+          await navigator.clipboard.writeText(text);
+          const original = btn.textContent;
+          btn.textContent = 'Copied!';
+          setTimeout(() => { btn.textContent = original; }, 1500);
+        } catch (e) {
+          alert('Could not copy automatically. Full text:\n\n' + text);
+        }
+      });
+    });
+  }
+
+  async function markAsPosted(queueId) {
+    const input = document.getElementById(`url-${queueId}`);
+    const url = input.value.trim();
+    if (!url) {
+      input.style.borderColor = 'var(--redline)';
+      return;
+    }
+    const { error } = await db
+      .from('publishing_queue')
+      .update({ status: 'published', published_url: url })
+      .eq('id', queueId);
+    if (error) {
+      alert('Could not update: ' + error.message);
+      return;
+    }
+    loadQueue();
+  }
+
+  document.getElementById('login-btn').addEventListener('click', async () => {
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const msg = document.getElementById('login-msg');
+    msg.textContent = '';
+
+    const { data, error } = await db.auth.signInWithPassword({ email, password });
+    if (error) {
+      msg.textContent = error.message;
+      msg.className = 'form-msg error';
+      return;
+    }
+    await onSignedIn(data.user.id);
+  });
+
+  document.getElementById('logout-btn').addEventListener('click', async () => {
+    if (realtimeChannel) {
+      await db.removeChannel(realtimeChannel);
+      realtimeChannel = null;
+    }
+    await db.auth.signOut();
+    currentUser = null;
+    document.getElementById('email').value = '';
+    document.getElementById('password').value = '';
+    showLogin();
+  });
+
+  document.getElementById('submit-btn').addEventListener('click', async () => {
+    const rawIdea = document.getElementById('raw-idea').value.trim();
+    const targetAudience = document.getElementById('target-audience').value.trim();
+    const sourceUrl = document.getElementById('source-url').value.trim();
+    const supportingMaterial = document.getElementById('supporting-material').value.trim();
+    const msg = document.getElementById('submit-msg');
+    const btn = document.getElementById('submit-btn');
+
+    if (!rawIdea || !targetAudience) {
+      msg.textContent = 'The idea and audience fields are both required.';
+      msg.className = 'form-msg error';
+      return;
+    }
+
+    btn.disabled = true;
+    msg.textContent = '';
+
+    const { error } = await db.from('content_requests').insert({
+      owner_id: currentUser.id,
+      raw_idea: rawIdea,
+      target_audience: targetAudience,
+      source_url: sourceUrl || null,
+      supporting_material: supportingMaterial || null
+    });
+
+    btn.disabled = false;
+
+    if (error) {
+      msg.textContent = 'Could not submit: ' + error.message;
+      msg.className = 'form-msg error';
+      return;
+    }
+
+    msg.textContent = 'Submitted — research is starting now.';
+    msg.className = 'form-msg ok';
+    document.getElementById('raw-idea').value = '';
+    document.getElementById('target-audience').value = '';
+    document.getElementById('source-url').value = '';
+    document.getElementById('supporting-material').value = '';
+    loadRequests();
+  });
+
+  checkSession();
+</script>
+</body>
+</html>lex+Sans:wght@400;500&family=IBM+Plex+Serif:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   :root {
