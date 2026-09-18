@@ -341,6 +341,7 @@
       <a id="nav-requests" class="active">Requests</a>
       <a id="nav-queue">Publishing queue</a>
       <a id="nav-invite" class="hidden">Invite user</a>
+      <a id="nav-users" class="hidden">Users</a>
     </nav>
     <div class="who">
       <strong id="who-name">—</strong>
@@ -421,6 +422,15 @@
         </div>
         <button class="primary" id="send-invite-btn">Send invite</button>
         <div id="invite-msg" class="form-msg"></div>
+      </section>
+    </div>
+
+    <div id="users-view" class="hidden">
+      <section>
+        <h2>Users</h2>
+        <div id="users-table-wrap">
+          <div class="empty">Loading…</div>
+        </div>
       </section>
     </div>
   </div>
@@ -508,6 +518,7 @@
 
     if (currentUser.role === 'manager') {
       document.getElementById('nav-invite').classList.remove('hidden');
+      document.getElementById('nav-users').classList.remove('hidden');
     }
 
     subscribeToRequestChanges();
@@ -777,15 +788,54 @@
     document.getElementById('nav-requests').classList.toggle('active', view === 'requests');
     document.getElementById('nav-queue').classList.toggle('active', view === 'queue');
     document.getElementById('nav-invite').classList.toggle('active', view === 'invite');
+    document.getElementById('nav-users').classList.toggle('active', view === 'users');
     document.getElementById('requests-view').classList.toggle('hidden', view !== 'requests');
     document.getElementById('queue-view').classList.toggle('hidden', view !== 'queue');
     document.getElementById('invite-view').classList.toggle('hidden', view !== 'invite');
+    document.getElementById('users-view').classList.toggle('hidden', view !== 'users');
     if (view === 'queue') loadQueue();
+    if (view === 'users') loadUsers();
   }
 
   document.getElementById('nav-requests').addEventListener('click', () => switchView('requests'));
   document.getElementById('nav-queue').addEventListener('click', () => switchView('queue'));
   document.getElementById('nav-invite').addEventListener('click', () => switchView('invite'));
+  document.getElementById('nav-users').addEventListener('click', () => switchView('users'));
+
+  // ---- Users (manager only) ----
+
+  async function loadUsers() {
+    const wrap = document.getElementById('users-table-wrap');
+    const { data, error } = await db
+      .from('users')
+      .select('id, name, email, role, created_at')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      wrap.innerHTML = `<div class="empty">Couldn't load users: ${error.message}</div>`;
+      return;
+    }
+    if (!data || data.length === 0) {
+      wrap.innerHTML = `<div class="empty">No users found.</div>`;
+      return;
+    }
+
+    const rows = data.map(u => `
+      <tr>
+        <td>${escapeHtml(u.name)}</td>
+        <td>${escapeHtml(u.email || '—')}</td>
+        <td>${u.role === 'manager' ? 'Manager' : 'Content Strategist'}</td>
+        <td>${fmtDate(u.created_at)}</td>
+      </tr>
+    `).join('');
+
+    wrap.innerHTML = `
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
 
   // ---- Invite user ----
 
