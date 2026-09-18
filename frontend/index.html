@@ -205,6 +205,33 @@
   .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
   .empty { color: var(--copy-gray); font-size: 14px; padding: 16px 0; }
 
+  .pipeline-progress { display: flex; align-items: flex-start; margin: 8px 0 24px; }
+  .pipeline-step { flex: 1; display: flex; flex-direction: column; align-items: center; position: relative; text-align: center; }
+  .pipeline-step:not(:last-child)::after {
+    content: ''; position: absolute; top: 7px; left: 50%; width: 100%; height: 2px;
+    background: var(--rule); z-index: 0;
+  }
+  .pipeline-step.done:not(:last-child)::after { background: var(--press-green); }
+  .pipeline-dot {
+    width: 16px; height: 16px; border-radius: 50%; background: #fff;
+    border: 2px solid var(--rule); z-index: 1; margin-bottom: 8px;
+  }
+  .pipeline-step.done .pipeline-dot { background: var(--press-green); border-color: var(--press-green); }
+  .pipeline-step.current .pipeline-dot {
+    background: var(--wire-blue); border-color: var(--wire-blue);
+    animation: pipeline-pulse 1.5s infinite;
+  }
+  @keyframes pipeline-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(47,93,130,0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(47,93,130,0); }
+  }
+  .pipeline-label { font-size: 12px; color: var(--copy-gray); }
+  .pipeline-step.done .pipeline-label, .pipeline-step.current .pipeline-label { color: var(--ink); font-weight: 500; }
+  .pipeline-exception {
+    display: flex; align-items: center; gap: 8px; padding: 16px;
+    background: #fff; border: 1px solid var(--redline); font-size: 14px; margin: 8px 0 24px;
+  }
+
   .hidden { display: none; }
 
   /* ---- Detail view ---- */
@@ -773,10 +800,56 @@
     renderActionArea(request);
   }
 
+  function renderPipelineProgress(status) {
+    const exceptionStates = {
+      needs_more_context: 'This request needs more usable source material before it can proceed — try adding a clearer source URL or more supporting material.',
+      rate_limited: 'Waiting — this account already has too many requests in progress at once.',
+      failed: 'Something went wrong while processing this request. Check the audit log for details.'
+    };
+
+    if (exceptionStates[status]) {
+      return `
+        <div class="pipeline-exception">
+          <span class="dot" style="background:var(--redline)"></span>
+          ${escapeHtml(exceptionStates[status])}
+        </div>
+      `;
+    }
+
+    const stages = [
+      { key: 'researching', label: 'Research' },
+      { key: 'drafting', label: 'Drafting' },
+      { key: 'evaluating', label: 'Evaluating' },
+      { key: 'ready_for_review', label: 'Ready for review' }
+    ];
+    const currentIndex = stages.findIndex(s => s.key === status);
+
+    const stepsHtml = stages.map((stage, i) => {
+      let stateClass;
+      if (currentIndex === -1) {
+        stateClass = i === 0 ? 'current' : 'upcoming';
+      } else if (i < currentIndex) {
+        stateClass = 'done';
+      } else if (i === currentIndex) {
+        stateClass = 'current';
+      } else {
+        stateClass = 'upcoming';
+      }
+      return `
+        <div class="pipeline-step ${stateClass}">
+          <div class="pipeline-dot"></div>
+          <div class="pipeline-label">${escapeHtml(stage.label)}</div>
+        </div>
+      `;
+    }).join('');
+
+    return `<div class="pipeline-progress">${stepsHtml}</div>`;
+  }
+
   function renderDrafts(request, drafts, evaluationsByDraft) {
     const grid = document.getElementById('drafts-grid');
     if (drafts.length === 0) {
-      grid.innerHTML = '<div class="empty">No drafts yet — still in the pipeline.</div>';
+      grid.innerHTML = renderPipelineProgress(request.status);
       return;
     }
 
