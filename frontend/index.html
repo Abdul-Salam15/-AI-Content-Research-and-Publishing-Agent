@@ -219,6 +219,15 @@
     margin-bottom: 24px;
     cursor: pointer;
   }
+  #go-to-login-link {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  #go-to-login-link.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
   .request-header h2.idea-title {
     font-family: var(--serif);
     font-size: 22px;
@@ -337,17 +346,23 @@
 <div id="set-password-screen" class="login-screen hidden">
   <div class="login-card">
     <h1>Welcome</h1>
-    <p class="sub">Set a password to finish joining.</p>
-    <div class="field">
-      <label for="new-password">New password</label>
-      <input type="password" id="new-password" autocomplete="new-password" />
+    <div id="set-password-form">
+      <p class="sub">Set a password to finish joining.</p>
+      <div class="field">
+        <label for="new-password">New password</label>
+        <input type="password" id="new-password" autocomplete="new-password" />
+      </div>
+      <div class="field">
+        <label for="confirm-password">Confirm password</label>
+        <input type="password" id="confirm-password" autocomplete="new-password" />
+      </div>
+      <button class="primary" id="set-password-btn">Set password and continue</button>
+      <div id="set-password-msg" class="form-msg"></div>
     </div>
-    <div class="field">
-      <label for="confirm-password">Confirm password</label>
-      <input type="password" id="confirm-password" autocomplete="new-password" />
+    <div id="set-password-success" class="hidden">
+      <p class="sub">Password set successfully.</p>
+      <a class="back-link" id="go-to-login-link">Login to your account →</a>
     </div>
-    <button class="primary" id="set-password-btn">Set password and continue</button>
-    <div id="set-password-msg" class="form-msg"></div>
   </div>
 </div>
 
@@ -534,6 +549,11 @@
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('set-password-screen').classList.remove('hidden');
     document.getElementById('app').classList.add('hidden');
+    document.getElementById('set-password-form').classList.remove('hidden');
+    document.getElementById('set-password-success').classList.add('hidden');
+    document.getElementById('go-to-login-link').classList.remove('visible');
+    document.getElementById('new-password').value = '';
+    document.getElementById('confirm-password').value = '';
   }
 
   document.getElementById('set-password-btn').addEventListener('click', async () => {
@@ -568,15 +588,28 @@
         return;
       }
 
+      // Capture their email before signing out, so we can pre-fill the login form.
+      const { data: { session } } = await db.auth.getSession();
+      const inviteEmail = session ? session.user.email : '';
+
       // Clean the invite token out of the URL so a refresh doesn't replay this screen.
       window.history.replaceState(null, '', window.location.pathname);
 
-      const { data: { session } } = await db.auth.getSession();
-      if (session) {
-        await onSignedIn(session.user.id);
-      } else {
+      // Fully sign out of the fragile invite session rather than trying to
+      // continue it directly — they'll log in fresh with their new password.
+      await db.auth.signOut();
+
+      document.getElementById('set-password-form').classList.add('hidden');
+      document.getElementById('set-password-success').classList.remove('hidden');
+
+      setTimeout(() => {
+        document.getElementById('go-to-login-link').classList.add('visible');
+      }, 3000);
+
+      document.getElementById('go-to-login-link').addEventListener('click', () => {
+        document.getElementById('email').value = inviteEmail;
         showLogin();
-      }
+      });
     } catch (e) {
       msg.textContent = 'Unexpected error: ' + e.message;
       msg.className = 'form-msg error';
