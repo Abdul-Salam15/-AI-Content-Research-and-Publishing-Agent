@@ -1002,8 +1002,14 @@
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok || !data.success) {
-        msg.textContent = 'Could not regenerate: ' + (data.message || res.statusText);
-        msg.className = 'form-msg error';
+        if (data.rateLimited) {
+          msg.textContent = data.message;
+          msg.style.color = 'var(--wire-blue)';
+          msg.className = 'form-msg';
+        } else {
+          msg.textContent = 'Could not regenerate: ' + (data.message || res.statusText);
+          msg.className = 'form-msg error';
+        }
         btn.disabled = false;
         btn.textContent = originalText;
         return;
