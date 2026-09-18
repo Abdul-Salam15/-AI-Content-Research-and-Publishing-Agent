@@ -520,6 +520,7 @@
     const pw = document.getElementById('new-password').value;
     const confirmPw = document.getElementById('confirm-password').value;
     const msg = document.getElementById('set-password-msg');
+    const btn = document.getElementById('set-password-btn');
 
     if (pw.length < 6) {
       msg.textContent = 'Password must be at least 6 characters.';
@@ -532,21 +533,35 @@
       return;
     }
 
-    const { error } = await db.auth.updateUser({ password: pw });
-    if (error) {
-      msg.textContent = 'Could not set password: ' + error.message;
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Setting password…';
+    msg.textContent = '';
+
+    try {
+      const { error } = await db.auth.updateUser({ password: pw });
+      if (error) {
+        msg.textContent = 'Could not set password: ' + error.message;
+        msg.className = 'form-msg error';
+        btn.disabled = false;
+        btn.textContent = originalText;
+        return;
+      }
+
+      // Clean the invite token out of the URL so a refresh doesn't replay this screen.
+      window.history.replaceState(null, '', window.location.pathname);
+
+      const { data: { session } } = await db.auth.getSession();
+      if (session) {
+        await onSignedIn(session.user.id);
+      } else {
+        showLogin();
+      }
+    } catch (e) {
+      msg.textContent = 'Unexpected error: ' + e.message;
       msg.className = 'form-msg error';
-      return;
-    }
-
-    // Clean the invite token out of the URL so a refresh doesn't replay this screen.
-    window.history.replaceState(null, '', window.location.pathname);
-
-    const { data: { session } } = await db.auth.getSession();
-    if (session) {
-      await onSignedIn(session.user.id);
-    } else {
-      showLogin();
+      btn.disabled = false;
+      btn.textContent = originalText;
     }
   });
 
@@ -1127,18 +1142,36 @@
     const email = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value;
     const msg = document.getElementById('login-msg');
+    const btn = document.getElementById('login-btn');
+    const originalText = btn.textContent;
     msg.textContent = '';
+    btn.disabled = true;
+    btn.textContent = 'Signing in…';
 
-    const { data, error } = await db.auth.signInWithPassword({ email, password });
-    if (error) {
-      msg.textContent = error.message;
+    try {
+      const { data, error } = await db.auth.signInWithPassword({ email, password });
+      if (error) {
+        msg.textContent = error.message;
+        msg.className = 'form-msg error';
+        btn.disabled = false;
+        btn.textContent = originalText;
+        return;
+      }
+      await onSignedIn(data.user.id);
+    } catch (e) {
+      msg.textContent = 'Unexpected error: ' + e.message;
       msg.className = 'form-msg error';
-      return;
+      btn.disabled = false;
+      btn.textContent = originalText;
     }
-    await onSignedIn(data.user.id);
   });
 
   document.getElementById('logout-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('logout-btn');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Signing out…';
+
     if (realtimeChannel) {
       await db.removeChannel(realtimeChannel);
       realtimeChannel = null;
@@ -1147,6 +1180,8 @@
     currentUser = null;
     document.getElementById('email').value = '';
     document.getElementById('password').value = '';
+    btn.disabled = false;
+    btn.textContent = originalText;
     showLogin();
   });
 
