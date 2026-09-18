@@ -137,6 +137,36 @@
     white-space: nowrap;
   }
   .published-link { font-size: 13px; }
+
+  .pq-card { border-top: 1px solid var(--rule); padding: 24px 0; }
+  .pq-card:last-child { border-bottom: 1px solid var(--rule); }
+  .pq-title { font-size: 15px; font-weight: 500; margin: 0 0 14px; }
+  .pq-tabs { display: flex; border-bottom: 1px solid var(--rule); margin-bottom: 18px; }
+  .pq-tab {
+    appearance: none; background: none; border: none; border-bottom: 2px solid transparent;
+    color: var(--copy-gray); font-family: var(--sans); font-size: 13px;
+    padding: 6px 4px 10px; margin-right: 20px; cursor: pointer;
+    display: flex; align-items: center;
+  }
+  .pq-tab:hover { color: var(--ink); }
+  .pq-tab.is-active { color: var(--ink); border-bottom-color: var(--wire-blue); font-weight: 500; }
+  .pq-tab-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .pq-panel { display: none; }
+  .pq-panel.is-active { display: block; }
+  .pq-status-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .pq-status-label { font-size: 13px; color: var(--copy-gray); flex-grow: 1; }
+  .pq-copy-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; background: none; border: 1px solid var(--rule);
+    border-radius: 3px; color: var(--ink); cursor: pointer; padding: 0; flex-shrink: 0;
+  }
+  .pq-copy-btn:hover { border-color: var(--copy-gray); }
+  .pq-copy-btn svg { width: 13px; height: 13px; display: block; }
+  .pq-copy-btn.is-copied { border-color: var(--press-green); color: var(--press-green); }
+  .pq-fulltext {
+    font-family: var(--serif); font-size: 15px; line-height: 1.65; color: var(--ink);
+    white-space: pre-wrap; max-width: 62ch; margin: 0 0 18px;
+  }
   .main {
     flex: 1;
     padding: 40px 48px;
@@ -1420,13 +1450,9 @@
 
   // ---- Publishing queue ----
 
-  function previewFor(channel, content) {
-    if (!content) return '—';
-    if (channel === 'newsletter') return content.subject_line || '—';
-    if (channel === 'linkedin') return content.cta || (content.full_text || '').slice(0, 80);
-    if (channel === 'x') return content.full_text || '—';
-    return '—';
-  }
+  const CHANNEL_ORDER = ['linkedin', 'x', 'newsletter'];
+  const CHANNEL_LABELS = { linkedin: 'LinkedIn', x: 'X', newsletter: 'Newsletter' };
+  const COPY_ICON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
 
   async function loadQueue() {
     const wrap = document.getElementById('queue-table-wrap');
@@ -1451,52 +1477,92 @@
       return;
     }
 
-    const fullTextById = {};
-    const rows = data.map(row => {
+    // Group the flat per-channel rows into one entry per article, so the
+    // same article isn't repeated three times — LinkedIn/X/Newsletter
+    // become tabs on a single card instead of three separate rows.
+    const articles = new Map();
+    data.forEach(row => {
       const co = row.channel_outputs;
       const article = co && co.drafts ? co.drafts : null;
       const contentRequest = article && article.content_requests ? article.content_requests : null;
+      const contentRequestId = contentRequest ? contentRequest.id : `unknown-${row.id}`;
       const title = article && article.sections ? (article.sections._title || '(untitled)') : '(article not visible)';
-      const channel = co ? co.channel : '—';
-      const preview = co ? previewFor(co.channel, co.content) : '—';
-      const draftId = co ? co.draft_id : '';
-      const contentRequestId = contentRequest ? contentRequest.id : '';
+      const channel = co ? co.channel : 'unknown';
 
-      let actionHtml;
-      if (row.status === 'published') {
-        actionHtml = row.published_url
-          ? `<a class="published-link" href="${escapeHtml(row.published_url)}" target="_blank" rel="noopener">View live</a>`
-          : `<span class="empty">Published</span>`;
-      } else {
-        actionHtml = `
-          <div class="queue-post-row">
-            <button class="small" data-copy-id="${row.id}" style="background:var(--wire-blue)">Copy</button>
-            <input type="text" placeholder="Paste live URL" id="url-${row.id}" />
-            <button class="small" data-queue-id="${row.id}" data-draft-id="${draftId}" data-content-request-id="${contentRequestId}">Mark as posted</button>
+      if (!articles.has(contentRequestId)) {
+        articles.set(contentRequestId, { title, channels: {} });
+      }
+      articles.get(contentRequestId).channels[channel] = {
+        queueId: row.id,
+        status: row.status,
+        publishedUrl: row.published_url,
+        draftId: co ? co.draft_id : '',
+        contentRequestId,
+        fullText: co && co.content ? (co.content.full_text || '') : ''
+      };
+    });
+
+    const cardsHtml = Array.from(articles.values()).map((article, articleIdx) => {
+      const available = CHANNEL_ORDER.filter(c => article.channels[c]);
+
+      const tabsHtml = available.map((channel, i) => {
+        const row = article.channels[channel];
+        const dotColor = row.status === 'published' ? 'var(--press-green)' : 'var(--wire-blue)';
+        return `
+          <button type="button" class="pq-tab${i === 0 ? ' is-active' : ''}" data-channel="${channel}">
+            <span class="pq-tab-dot" style="background:${dotColor}"></span>${CHANNEL_LABELS[channel] || channel}
+          </button>
+        `;
+      }).join('');
+
+      const panelsHtml = available.map((channel, i) => {
+        const row = article.channels[channel];
+        const isPublished = row.status === 'published';
+
+        const actionHtml = isPublished
+          ? (row.publishedUrl
+              ? `<a class="published-link" href="${escapeHtml(row.publishedUrl)}" target="_blank" rel="noopener">View live</a>`
+              : `<span class="empty">Published</span>`)
+          : `
+            <div class="queue-post-row">
+              <input type="text" placeholder="Paste live URL" id="url-${row.queueId}" />
+              <button class="small" data-queue-id="${row.queueId}" data-draft-id="${row.draftId}" data-content-request-id="${row.contentRequestId}">Mark as posted</button>
+            </div>
+          `;
+
+        return `
+          <div class="pq-panel${i === 0 ? ' is-active' : ''}" data-channel="${channel}">
+            <div class="pq-status-row">
+              <span class="dot" style="background:${STATUS_COLOR[row.status] || 'var(--copy-gray)'}"></span>
+              <span class="pq-status-label">${row.status}</span>
+              <button type="button" class="pq-copy-btn" data-copy-id="${row.queueId}" title="Copy full text" aria-label="Copy full text">${COPY_ICON_SVG}</button>
+            </div>
+            <pre class="pq-fulltext" data-fulltext-id="${row.queueId}">${escapeHtml(row.fullText)}</pre>
+            ${actionHtml}
           </div>
         `;
-      }
-
-      const fullText = co && co.content ? (co.content.full_text || '') : '';
-      fullTextById[row.id] = fullText;
+      }).join('');
 
       return `
-        <tr>
-          <td class="idea-cell">${escapeHtml(title)}</td>
-          <td>${escapeHtml(channel)}</td>
-          <td class="queue-content-cell">${escapeHtml(preview)}</td>
-          <td><span class="status"><span class="dot" style="background:${STATUS_COLOR[row.status] || 'var(--copy-gray)'}"></span>${row.status}</span></td>
-          <td>${actionHtml}</td>
-        </tr>
+        <article class="pq-card" data-article="${articleIdx}">
+          <h3 class="pq-title">${escapeHtml(article.title)}</h3>
+          <div class="pq-tabs">${tabsHtml}</div>
+          ${panelsHtml}
+        </article>
       `;
     }).join('');
 
-    wrap.innerHTML = `
-      <table>
-        <thead><tr><th>Article</th><th>Channel</th><th>Preview</th><th>Status</th><th>Action</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    `;
+    wrap.innerHTML = cardsHtml;
+
+    // Tabs are purely client-side — switching channel never re-fetches.
+    wrap.querySelectorAll('.pq-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const card = btn.closest('.pq-card');
+        const channel = btn.dataset.channel;
+        card.querySelectorAll('.pq-tab').forEach(t => t.classList.toggle('is-active', t.dataset.channel === channel));
+        card.querySelectorAll('.pq-panel').forEach(p => p.classList.toggle('is-active', p.dataset.channel === channel));
+      });
+    });
 
     wrap.querySelectorAll('button[data-queue-id]').forEach(btn => {
       btn.addEventListener('click', () => markAsPosted(btn.dataset.queueId, btn.dataset.draftId, btn.dataset.contentRequestId));
@@ -1504,12 +1570,12 @@
 
     wrap.querySelectorAll('button[data-copy-id]').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const text = fullTextById[btn.dataset.copyId] || '';
+        const pre = wrap.querySelector(`pre[data-fulltext-id="${btn.dataset.copyId}"]`);
+        const text = pre ? pre.textContent : '';
         try {
           await navigator.clipboard.writeText(text);
-          const original = btn.textContent;
-          btn.textContent = 'Copied!';
-          setTimeout(() => { btn.textContent = original; }, 1500);
+          btn.classList.add('is-copied');
+          setTimeout(() => btn.classList.remove('is-copied'), 1500);
         } catch (e) {
           alert('Could not copy automatically. Full text:\n\n' + text);
         }
