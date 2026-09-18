@@ -874,13 +874,25 @@
     loadUsers();
   }
 
+  const N8N_DELETE_USER_URL = 'https://pod1.app.n8n.cloud/webhook/9e4155a4-5409-4c82-b9dd-2d93edc337da';
+
   async function deleteUser(userId, name) {
-    const confirmed = confirm(`Delete ${name}? This removes their access to the app immediately. This cannot be undone.`);
+    const confirmed = confirm(`Delete ${name}? This removes their access to the app immediately and cannot be undone.`);
     if (!confirmed) return;
 
-    const { error } = await db.from('users').delete().eq('id', userId);
-    if (error) {
-      alert('Could not delete user: ' + error.message);
+    try {
+      const res = await fetch(N8N_DELETE_USER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        alert('Could not delete user: ' + (data.message || res.statusText));
+        return;
+      }
+    } catch (e) {
+      alert('Could not reach the delete service: ' + e.message);
       return;
     }
     loadUsers();
