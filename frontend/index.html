@@ -231,6 +231,14 @@
     display: flex; align-items: center; gap: 8px; padding: 16px;
     background: #fff; border: 1px solid var(--redline); font-size: 14px; margin: 8px 0 24px;
   }
+  .approval-history { margin-bottom: 24px; }
+  .approval-item {
+    background: #fff; border: 1px solid var(--rule); border-left: 3px solid var(--rule);
+    padding: 12px 16px; margin-bottom: 8px;
+  }
+  .approval-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .approval-date { font-size: 12px; color: var(--copy-gray); }
+  .approval-comment { font-size: 14px; color: var(--ink); margin: 0; }
 
   .hidden { display: none; }
 
@@ -447,6 +455,7 @@
           <h2 class="idea-title" id="detail-idea">—</h2>
           <p class="audience" id="detail-audience">—</p>
         </div>
+        <div id="approval-history-wrap"></div>
         <div class="drafts-grid" id="drafts-grid"></div>
         <div id="action-area"></div>
       </section>
@@ -777,6 +786,14 @@
     document.getElementById('detail-idea').textContent = request.raw_idea;
     document.getElementById('detail-audience').textContent = request.target_audience;
 
+    const { data: approvals } = await db
+      .from('approvals')
+      .select('decision, comment, created_at')
+      .eq('content_request_id', requestId)
+      .order('created_at', { ascending: false });
+
+    document.getElementById('approval-history-wrap').innerHTML = renderApprovalHistory(approvals || []);
+
     const { data: drafts } = await db
       .from('drafts')
       .select('id, option_number, primary_keyword, image_brief, sections, eval_status')
@@ -798,6 +815,24 @@
 
     renderDrafts(request, drafts || [], evaluationsByDraft);
     renderActionArea(request);
+  }
+
+  function renderApprovalHistory(approvals) {
+    if (!approvals || approvals.length === 0) return '';
+
+    const labels = { approved: 'Approved', rejected: 'Rejected', needs_revision: 'Needs revision' };
+
+    const items = approvals.map(a => `
+      <div class="approval-item">
+        <div class="approval-header">
+          <span class="status"><span class="dot" style="background:${STATUS_COLOR[a.decision] || 'var(--copy-gray)'}"></span>${labels[a.decision] || a.decision}</span>
+          <span class="approval-date">${fmtDate(a.created_at)}</span>
+        </div>
+        ${a.comment ? `<p class="approval-comment">${escapeHtml(a.comment)}</p>` : ''}
+      </div>
+    `).join('');
+
+    return `<div class="approval-history">${items}</div>`;
   }
 
   function renderPipelineProgress(status) {
