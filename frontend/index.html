@@ -334,6 +334,23 @@
   </div>
 </div>
 
+<div id="set-password-screen" class="login-screen hidden">
+  <div class="login-card">
+    <h1>Welcome</h1>
+    <p class="sub">Set a password to finish joining.</p>
+    <div class="field">
+      <label for="new-password">New password</label>
+      <input type="password" id="new-password" autocomplete="new-password" />
+    </div>
+    <div class="field">
+      <label for="confirm-password">Confirm password</label>
+      <input type="password" id="confirm-password" autocomplete="new-password" />
+    </div>
+    <button class="primary" id="set-password-btn">Set password and continue</button>
+    <div id="set-password-msg" class="form-msg"></div>
+  </div>
+</div>
+
 <div id="app" class="app hidden">
   <div class="sidebar">
     <div class="brand">AI Content Delivery Pipeline</div>
@@ -445,6 +462,10 @@
   const { createClient } = supabase;
   const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+  // Detect an invite-link arrival before anything else consumes the URL hash.
+  const hashParams = new URLSearchParams(window.location.hash.substring(1));
+  const isInviteFlow = hashParams.get('type') === 'invite';
+
   const STATUS_LABELS = {
     draft: 'Draft', rate_limited: 'Rate limited', researching: 'Researching',
     needs_more_context: 'Needs more context', drafting: 'Drafting',
@@ -474,7 +495,9 @@
 
   async function checkSession() {
     const { data: { session } } = await db.auth.getSession();
-    if (session) {
+    if (session && isInviteFlow) {
+      showSetPasswordScreen();
+    } else if (session) {
       await onSignedIn(session.user.id);
     } else {
       showLogin();
@@ -483,8 +506,49 @@
 
   function showLogin() {
     document.getElementById('login-screen').classList.remove('hidden');
+    document.getElementById('set-password-screen').classList.add('hidden');
     document.getElementById('app').classList.add('hidden');
   }
+
+  function showSetPasswordScreen() {
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('set-password-screen').classList.remove('hidden');
+    document.getElementById('app').classList.add('hidden');
+  }
+
+  document.getElementById('set-password-btn').addEventListener('click', async () => {
+    const pw = document.getElementById('new-password').value;
+    const confirmPw = document.getElementById('confirm-password').value;
+    const msg = document.getElementById('set-password-msg');
+
+    if (pw.length < 6) {
+      msg.textContent = 'Password must be at least 6 characters.';
+      msg.className = 'form-msg error';
+      return;
+    }
+    if (pw !== confirmPw) {
+      msg.textContent = 'Passwords do not match.';
+      msg.className = 'form-msg error';
+      return;
+    }
+
+    const { error } = await db.auth.updateUser({ password: pw });
+    if (error) {
+      msg.textContent = 'Could not set password: ' + error.message;
+      msg.className = 'form-msg error';
+      return;
+    }
+
+    // Clean the invite token out of the URL so a refresh doesn't replay this screen.
+    window.history.replaceState(null, '', window.location.pathname);
+
+    const { data: { session } } = await db.auth.getSession();
+    if (session) {
+      await onSignedIn(session.user.id);
+    } else {
+      showLogin();
+    }
+  });
 
   async function onSignedIn(userId) {
     const { data: profile, error } = await db
